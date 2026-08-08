@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Iconic Ludo</title>
+<style>
+  :root{
+    --red:#f44336;
+    --red-dark:#d32f2f;
+    --green:#4caf50;
+    --green-dark:#388e3c;
+    --yellow:#ffc107;
+    --yellow-dark:#ffa000;
+    --blue:#2196f3;
+    --blue-dark:#1976d2;
+    --board-bg:#34495e;
+    --paper:#2c3e50;
+    --ink:#ecf0f1;
+    --muted:#95a5a6;
+    --line:#4a627a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:linear-gradient(180deg, #233140, #1c2833);color:var(--ink);}
+  #app{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:16px;}
+
+  /* ---------- SETUP SCREEN ---------- */
+  #setupScreen{max-width:480px;width:100%;margin-top:4vh;text-align:center;}
+  #setupScreen h1{font-size:2.4em;margin:0 0 4px;letter-spacing:-0.02em;}
+  #setupScreen h1 span{color:var(--red);}
+  #setupScreen .tag{color:var(--muted);margin-bottom:28px;font-size:0.98em;}
+  .panel{background:var(--paper);border-radius:18px;padding:22px;box-shadow:0 6px 24px rgba(0,0,0,0.08);}
+  .panel h3{margin:0 0 14px;font-size:0.95em;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);}
+  .colorToggles{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .colorToggle{
+    display:flex;align-items:center;gap:10px;border:2px solid var(--line);border-radius:12px;
+    padding:12px 14px;cursor:pointer;user-select:none;transition:all .15s;font-weight:600;
+  }
+  .colorToggle.active{border-color:transparent;color:#fff;transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,0.15);}
+  .colorToggle .dot{width:16px;height:16px;border-radius:50%;flex-shrink:0;}
+  .colorToggle[data-c="red"].active{background:var(--red);}
+  .colorToggle[data-c="green"].active{background:var(--green);}
+  .colorToggle[data-c="yellow"].active{background:var(--yellow-dark);}
+  .colorToggle[data-c="blue"].active{background:var(--blue);}
+  .colorToggle[data-c="red"] .dot{background:var(--red);}
+  .colorToggle[data-c="green"] .dot{background:var(--green);}
+  .colorToggle[data-c="yellow"] .dot{background:var(--yellow);}
+  .colorToggle[data-c="blue"] .dot{background:var(--blue);}
+  .colorToggle.active .dot{background:#fff;}
+  #startBtn{
+    margin-top:20px;width:100%;padding:14px;border:none;border-radius:12px;background:var(--ink);
+    color:#2c3e50;font-size:1.05em;font-weight:700;cursor:pointer;transition:transform .1s;
+  }
+  #startBtn:active{transform:scale(0.98);}
+  #startBtn:disabled{opacity:0.4;cursor:not-allowed;}
+  #setupHint{margin-top:10px;font-size:0.85em;color:var(--muted);min-height:18px;}
+
+  /* ---------- GAME SCREEN ---------- */
+  #gameScreen{width:100%;max-width:1000px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+  #topBar{width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 4px;}
+  #topBar h1{font-size:1.3em;margin:0;}
+  #topBar h1 span{color:var(--red);}
+  #restartBtn{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;color:var(--muted);font-weight:600;font-size:0.85em;}
+  #restartBtn:hover{background:var(--board-bg);color:var(--ink);}
+
+  #mainArea{width:100%;display:flex;gap:18px;align-items:flex-start;}
+  #boardWrap{flex:0 0 auto;width:min(560px,58vw);max-width:560px;}
+  #board{
+    width:100%;aspect-ratio:1/1;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);
+    background:var(--board-bg);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.18);overflow:hidden;border:3px solid var(--paper);
+  }
+
+  .yard{display:flex;align-items:center;justify-content:center;position:relative;}
+  .yard-red{background:var(--red);}
+  .yard-green{background:var(--green);}
+  .yard-yellow{background:var(--yellow);}
+  .yard-blue{background:var(--blue);}
+  .yard-inner{width:66%;height:66%;background:var(--board-bg);border-radius:14%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6%;padding:8%;}
+  .slot{border-radius:50%;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;}
+
+  .cell{position:relative;background:var(--board-bg);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;padding:1px;}
+  .cell.start-red{background:var(--red);}
+  .cell.start-green{background:var(--green);}
+  .cell.start-yellow{background:var(--yellow);}
+  .cell.start-blue{background:var(--blue);}
+  .cell.home-red{background:var(--red);}
+  .cell.home-green{background:var(--green);}
+  .cell.home-yellow{background:var(--yellow);}
+  .cell.home-blue{background:var(--blue);}
+  .cell.safe::before{
+    content:"★";position:absolute;font-size:16px;color:rgba(255,255,255,0.6);pointer-events:none;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+
+  .center{position:relative;overflow:hidden;}
+  .tri{position:absolute;width:100%;height:100%;top:0;left:0;}
+  .tri-top{background:var(--green);clip-path:polygon(0 0,100% 0,50% 50%);}
+  .tri-right{background:var(--yellow);clip-path:polygon(100% 0,100% 100%,50% 50%);}
+  .tri-bottom{background:var(--blue);clip-path:polygon(100% 100%,0 100%,50% 50%);}
+  .tri-left{background:var(--red);clip-path:polygon(0 100%,0 0,50% 50%);}
+
+  .token{
+    border-radius:50%;width:76%;height:76%;position:relative;cursor:default;
+    box-shadow:0 2px 4px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 2px 2px rgba(255,255,255,0.4);
+    border:1.5px solid rgba(0,0,0,0.25);
+    transition:transform .12s;
+  }
+  .token.tok-red{background:radial-gradient(circle at 35% 30%, #ff7b70, var(--red));}
+  .token.tok-green{background:radial-gradient(circle at 35% 30%, #6ac26d, var(--green));}
+  .token.tok-yellow{background:radial-gradient(circle at 35% 30%, #ffd469, var(--yellow));}
+  .token.tok-blue{background:radial-gradient(circle at 35% 30%, #74a8ec, var(--blue));}
+  .token.movable{cursor:pointer;animation:bounce 0.7s infinite;box-shadow:0 0 0 3px rgba(255,255,255,0.9),0 0 10px 3px rgba(0,0,0,0.35);}
+  .token.movable:hover{transform:scale(1.15);}
+  @keyframes bounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-4px);}}
+
+  /* ---------- SIDE PANEL ---------- */
+  #sidePanel{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0;}
+  #turnIndicator{
+    padding:12px 16px;border-radius:12px;color:#fff;font-weight:700;font-size:1.05em;
+    text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:background .2s;
+  }
+  #diceCard{background:var(--paper);border-radius:14px;padding:16px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.08);}
+  #dice{
+    width:64px;height:64px;margin:0 auto 12px;background:var(--board-bg);border-radius:14px;border:2px solid var(--line);
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:8px;gap:2px;
+    box-shadow:0 3px 0 rgba(0,0,0,0.25);transition:transform .15s;
+  }
+  #dice.rolling{animation:spin .5s linear infinite;}
+  @keyframes spin{0%{transform:rotate(0deg) scale(1);}50%{transform:rotate(180deg) scale(1.1);}100%{transform:rotate(360deg) scale(1);}}
+  .pip{border-radius:50%;background:var(--ink);opacity:0;align-self:center;justify-self:center;width:10px;height:10px;}
+  .pip.on{opacity:1;}
+  #rollBtn{
+    width:100%;padding:12px;border:none;border-radius:10px;background:var(--ink);color:#2c3e50;
+    font-weight:700;font-size:1em;cursor:pointer;
+  }
+  #rollBtn:disabled{opacity:0.35;cursor:not-allowed;}
+  #diceHint{margin-top:8px;font-size:0.82em;color:var(--muted);min-height:16px;}
+
+  #playerList{background:var(--paper);border-radius:14px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,0.08);}
+  #playerList h4{margin:0 0 10px;font-size:0.8em;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
+  .plRow{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.92em;}
+  .plRow .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .plRow.finished{opacity:0.5;text-decoration:line-through;}
+  .plRow .rank{margin-left:auto;font-weight:700;color:var(--muted);}
+
+  #log{background:var(--paper);border-radius:14px;padding:12px 16px;box-shadow:0 4px 14px rgba(0,0,0,0.08);color:var(--muted);
+       font-size:0.82em;max-height:150px;overflow-y:auto;flex:1;}
+  #log h4{margin:0 0 8px;font-size:0.8em;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);}
+  #log div.entry{padding:3px 0;border-bottom:1px dashed var(--line);}
+  #log div.entry:last-child{border:none;}
+
+  .hidden{display:none !important;}
+
+  #winModal{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+  #winCard{background:var(--paper);border-radius:18px;padding:30px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.4);}
+  #winCard h2{margin-top:0;}
+  #winCard ol{text-align:left;padding-left:22px;}
+  #winCard button{margin-top:16px;width:100%;padding:12px;border:none;border-radius:10px;background:var(--ink);color:#fff;font-weight:700;cursor:pointer;}
+
+  @media (max-width:760px){
+    #mainArea{flex-direction:column;align-items:center;}
+    #boardWrap{width:min(560px,94vw);}
+    #sidePanel{width:min(560px,94vw);}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <div id="setupScreen">
+    <h1>🎲 <span>Iconic Ludo</span></h1>
+    <div class="tag">Khelo Ludo, Color Choose karo</div>
+    <div class="panel">
+      <h3>Choose Players (2–4)</h3>
+      <div class="colorToggles">
+        <div class="colorToggle active" data-c="red"><span class="dot"></span>Red</div>
+        <div class="colorToggle active" data-c="green"><span class="dot"></span>Green</div>
+        <div class="colorToggle active" data-c="yellow"><span class="dot"></span>Yellow</div>
+        <div class="colorToggle active" data-c="blue"><span class="dot"></span>Blue</div>
+      </div>
+      <button id="startBtn">Start Game</button>
+      <div id="setupHint"></div>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="gameScreen" class="hidden">
+    <div id="topBar">
+      <h1>🎲 <span>Ludo</span></h1>
+      <button id="restartBtn">↺ New Game</button>
+    </div>
+    <div id="mainArea">
+      <div id="boardWrap"><div id="board"></div></div>
+      <div id="sidePanel">
+        <div id="turnIndicator">—</div>
+        <div id="diceCard">
+          <div id="dice">
+            <div class="pip"></div><div class="pip"></div><div class="pip"></div>
+            <div class="pip"></div><div class="pip"></div><div class="pip"></div>
+            <div class="pip"></div><div class="pip"></div><div class="pip"></div>
+          </div>
+          <button id="rollBtn">Roll Dice</button>
+          <div id="diceHint"></div>
+        </div>
+        <div id="playerList"><h4>Players</h4><div id="playerListBody"></div></div>
+        <div id="log"><h4>Log</h4><div id="logBody"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="winModal" class="hidden">
+    <div id="winCard">
+      <h2>🏆 Game Over</h2>
+      <ol id="rankList"></ol>
+      <button id="playAgainBtn">Play Again</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- BOARD GEOMETRY ---------------- */
+  const mainLoop = [
+    [6,1],[6,2],[6,3],[6,4],[6,5],
+    [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
+    [0,7],
+    [0,8],
+    [1,8],[2,8],[3,8],[4,8],[5,8],
+    [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],
+    [7,14],
+    [8,14],
+    [8,13],[8,12],[8,11],[8,10],[8,9],
+    [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],
+    [14,7],
+    [14,6],
+    [13,6],[12,6],[11,6],[10,6],[9,6],
+    [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],
+    [7,0],
+    [6,0]
+  ];
+  const startIndex = { red:0, green:13, yellow:26, blue:39 };
+  const homeColumns = {
+    red:    [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
+    green:  [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
+    yellow: [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
+    blue:   [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]]
+  };
+  const safeAbsIdx = [0,8,13,21,26,34,39,47];
+  const safeCoords = new Set(safeAbsIdx.map(i => mainLoop[i][0]+','+mainLoop[i][1]));
+
+  const ALL_COLORS = ['red','green','yellow','blue'];
+  const COLOR_LABEL = {red:'Red',green:'Green',yellow:'Yellow',blue:'Blue'};
+
+  function buildPath(color){
+    const S = startIndex[color];
+    const path = [];
+    for(let i=0;i<=50;i++) path.push(mainLoop[(S+i)%52]);
+    homeColumns[color].forEach(c=>path.push(c));
+    return path; // length 57, idx 0..56
+  }
+  const paths = {};
+  ALL_COLORS.forEach(c=>paths[c]=buildPath(c));
+
+  /* ---------------- STATE ---------------- */
+  let state = null;
+
+  function freshState(activeColors){
+    return {
+      players: activeColors.slice(),
+      currentColor: activeColors[0],
+      tokens: Object.fromEntries(activeColors.map(c=>[c,[-1,-1,-1,-1]])),
+      finishedOrder: [],
+      dice: null,
+      consecutiveSix: 0,
+      movable: [],
+      animating: false,
+      awaitingMove: false,
+      gameOver: false
+    };
+  }
+
+  /* ---------------- BOARD DOM BUILD (once) ---------------- */
+  const boardEl = document.getElementById('board');
+
+  function buildBoardDOM(){
+    boardEl.innerHTML = '';
+
+    // yards
+    const yardSpec = {
+      red:    {row:'1 / 7', col:'1 / 7'},
+      green:  {row:'1 / 7', col:'10 / 16'},
+      yellow: {row:'10 / 16', col:'10 / 16'},
+      blue:   {row:'10 / 16', col:'1 / 7'}
+    };
+    ALL_COLORS.forEach(color=>{
+      const y = document.createElement('div');
+      y.className = 'yard yard-'+color;
+      y.style.gridRow = yardSpec[color].row;
+      y.style.gridColumn = yardSpec[color].col;
+      const inner = document.createElement('div');
+      inner.className = 'yard-inner';
+      for(let i=0;i<4;i++){
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        slot.id = 'slot-'+color+'-'+i;
+        inner.appendChild(slot);
+      }
+      y.appendChild(inner);
+      boardEl.appendChild(y);
+    });
+
+    // center
+    const center = document.createElement('div');
+    center.className = 'center';
+    center.style.gridRow = '7 / 10';
+    center.style.gridColumn = '7 / 10';
+    ['top','right','bottom','left'].forEach(pos=>{
+      const t = document.createElement('div');
+      t.className = 'tri tri-'+pos;
+      center.appendChild(t);
+    });
+    boardEl.appendChild(center);
+
+    // path cells: main loop
+    const startCoords = new Set(Object.values(startIndex).map(i=>mainLoop[i][0]+','+mainLoop[i][1]));
+    const startColorAt = {};
+    ALL_COLORS.forEach(c=>{ const [r,cc]=mainLoop[startIndex[c]]; startColorAt[r+','+cc]=c; });
+
+    mainLoop.forEach(([r,c])=>{
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.id = 'cell-'+r+'-'+c;
+      cell.style.gridRow = (r+1)+' / span 1';
+      cell.style.gridColumn = (c+1)+' / span 1';
+      const key = r+','+c;
+      if(startColorAt[key]) cell.classList.add('start-'+startColorAt[key]);
+      else if(safeCoords.has(key)) cell.classList.add('safe');
+      boardEl.appendChild(cell);
+    });
+
+    // home columns
+    ALL_COLORS.forEach(color=>{
+      homeColumns[color].forEach(([r,c])=>{
+        const cell = document.createElement('div');
+        cell.className = 'cell home-'+color;
+        cell.id = 'cell-'+r+'-'+c;
+        cell.style.gridRow = (r+1)+' / span 1';
+        cell.style.gridColumn = (c+1)+' / span 1';
+        boardEl.appendChild(cell);
+      });
+    });
+  }
+
+  /* ---------------- RENDER ---------------- */
+  function clearTokenDom(){
+    document.querySelectorAll('.token').forEach(t=>t.remove());
+  }
+
+  function makeTokenEl(color){
+    const el = document.createElement('div');
+    el.className = 'token tok-'+color;
+    return el;
+  }
+
+  function renderTokens(){
+    clearTokenDom();
+    state.players.forEach(color=>{
+      state.tokens[color].forEach((pos, idx)=>{
+        const el = makeTokenEl(color);
+        el.dataset.color = color;
+        el.dataset.idx = idx;
+        if(pos === -1){
+          const slot = document.getElementById('slot-'+color+'-'+idx);
+          if(slot) slot.appendChild(el);
+        } else {
+          const [r,c] = paths[color][pos];
+          const cell = document.getElementById('cell-'+r+'-'+c);
+          if(cell) cell.appendChild(el);
+        }
+        if(state.awaitingMove && color===state.currentColor && state.movable.includes(idx)){
+          el.classList.add('movable');
+          el.addEventListener('click', ()=>onTokenClick(color, idx));
+        }
+      });
+    });
+  }
+
+  function colorVar(color){
+    return {red:'var(--red)',green:'var(--green)',yellow:'var(--yellow-dark)',blue:'var(--blue)'}[color];
+  }
+
+  function renderTurnIndicator(){
+    const ti = document.getElementById('turnIndicator');
+    if(state.gameOver){ ti.textContent = 'Game Over'; ti.style.background = '#555'; return; }
+    ti.textContent = COLOR_LABEL[state.currentColor] + "'s Turn";
+    ti.style.background = colorVar(state.currentColor);
+  }
+
+  function renderPlayerList(){
+    const body = document.getElementById('playerListBody');
+    body.innerHTML = '';
+    ALL_COLORS.filter(c=>state.tokens[c]).forEach(color=>{
+      const row = document.createElement('div');
+      row.className = 'plRow';
+      const finishedRank = state.finishedOrder.indexOf(color);
+      if(finishedRank !== -1) row.classList.add('finished');
+      const home = state.tokens[color].filter(p=>p===56).length;
+      row.innerHTML = `<span class="dot" style="background:${colorVar(color)}"></span>
+        <span>${COLOR_LABEL[color]}</span>
+        <span style="color:#999;font-size:0.85em;">${home}/4 home</span>
+        ${finishedRank!==-1 ? `<span class="rank">#${finishedRank+1}</span>` : ''}`;
+      body.appendChild(row);
+    });
+  }
+
+  function renderDice(val){
+    const patterns = {
+      1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8]
+    };
+    const pips = document.querySelectorAll('#dice .pip');
+    pips.forEach(p=>p.classList.remove('on'));
+    if(val){
+      patterns[val].forEach(i=>pips[i].classList.add('on'));
+    }
+  }
+
+  function log(msg){
+    const body = document.getElementById('logBody');
+    const div = document.createElement('div');
+    div.className = 'entry';
+    div.textContent = msg;
+    body.insertBefore(div, body.firstChild);
+    while(body.children.length > 40) body.removeChild(body.lastChild);
+  }
+
+  function renderAll(){
+    renderTurnIndicator();
+    renderPlayerList();
+    renderTokens();
+    const rollBtn = document.getElementById('rollBtn');
+    rollBtn.disabled = state.animating || state.awaitingMove || state.gameOver;
+    const hint = document.getElementById('diceHint');
+    if(state.gameOver) hint.textContent = '';
+    else if(state.awaitingMove) hint.textContent = 'Tap a glowing piece to move it';
+    else hint.textContent = '';
+  }
+
+  /* ---------------- GAME LOGIC ---------------- */
+  function computeMovable(color, dice){
+    const arr = [];
+    state.tokens[color].forEach((p, idx)=>{
+      if(p === 56) return;
+      if(p === -1){ if(dice === 6) arr.push(idx); }
+      else if(p + dice <= 56) arr.push(idx);
+    });
+    return arr;
+  }
+
+  function rollDice(){
+    if(state.animating || state.awaitingMove || state.gameOver) return;
+    const dice = document.getElementById('dice');
+    dice.classList.add('rolling');
+    document.getElementById('rollBtn').disabled = true;
+    let ticks = 0;
+    const spin = setInterval(()=>{
+      renderDice(1 + Math.floor(Math.random()*6));
+      ticks++;
+      if(ticks > 8){
+        clearInterval(spin);
+        dice.classList.remove('rolling');
+        finishRoll();
+      }
+    }, 60);
+  }
+
+  function finishRoll(){
+    const val = 1 + Math.floor(Math.random()*6);
+    state.dice = val;
+    renderDice(val);
+    log(`${COLOR_LABEL[state.currentColor]} rolled a ${val}.`);
+
+    if(val === 6) state.consecutiveSix++;
+    else state.consecutiveSix = 0;
+
+    if(state.consecutiveSix === 3){
+      log(`Three 6's in a row — ${COLOR_LABEL[state.currentColor]}'s turn is forfeited!`);
+      state.consecutiveSix = 0;
+      advanceTurn();
+      renderAll();
+      return;
+    }
+
+    const movable = computeMovable(state.currentColor, val);
+    if(movable.length === 0){
+      log(`No valid moves for ${COLOR_LABEL[state.currentColor]}.`);
+      advanceTurn();
+      renderAll();
+      return;
+    }
+
+    if(movable.length === 1){
+      log(`Only one possible move, moving automatically.`);
+      // This is almost the same as onTokenClick, but without the checks
+      state.awaitingMove = false;
+      state.animating = true;
+      renderAll(); // To disable roll button etc.
+      // A small delay so the user can see the dice result before the token moves
+      setTimeout(()=> moveToken(state.currentColor, movable[0]), 400);
+    } else {
+      state.movable = movable;
+      state.awaitingMove = true;
+      renderAll();
+    }
+  }
+
+  function onTokenClick(color, idx){
+    if(!state.awaitingMove || color !== state.currentColor) return;
+    if(!state.movable.includes(idx)) return;
+    state.awaitingMove = false;
+    state.animating = true;
+    renderAll();
+    moveToken(color, idx);
+  }
+
+  function moveToken(color, idx){
+    const fromPos = state.tokens[color][idx];
+    const toPos = fromPos === -1 ? 0 : fromPos + state.dice;
+    const steps = [];
+    for(let p = (fromPos === -1 ? 0 : fromPos+1); p <= toPos; p++) steps.push(p);
+
+    let i = 0;
+    function step(){
+      if(i >= steps.length){ afterMove(color, idx, toPos); return; }
+      state.tokens[color][idx] = steps[i];
+      renderTokens();
+      i++;
+      setTimeout(step, 150);
+    }
+    if(fromPos === -1) log(`${COLOR_LABEL[color]} brought a piece out!`);
+    step();
+  }
+
+  function afterMove(color, idx, toPos){
+    let captured = false;
+
+    if(toPos <= 50){
+      const [r,c] = paths[color][toPos];
+      const key = r+','+c;
+      if(!safeCoords.has(key)){
+        state.players.forEach(other=>{
+          if(other === color) return;
+          state.tokens[other].forEach((p2, idx2)=>{
+            if(p2 < 0 || p2 > 50) return;
+            const [r2,c2] = paths[other][p2];
+            if(r2 === r && c2 === c){
+              state.tokens[other][idx2] = -1;
+              captured = true;
+              log(`💥 ${COLOR_LABEL[color]} sent ${COLOR_LABEL[other]}'s piece back home!`);
+            }
+          });
+        });
+      }
+    }
+
+    let justFinishedColor = false;
+    let removalIdx = 0;
+    if(toPos === 56){
+      log(`🏠 ${COLOR_LABEL[color]} got a piece home!`);
+      if(state.tokens[color].every(p=>p===56)){
+        justFinishedColor = true;
+        state.finishedOrder.push(color);
+        log(`🎉 ${COLOR_LABEL[color]} finished all pieces — place #${state.finishedOrder.length}!`);
+        removalIdx = state.players.indexOf(color);
+        state.players = state.players.filter(c=>c!==color);
+      }
+    }
+
+    state.animating = false;
+    state.movable = [];
+
+    if(state.players.length <= 1){
+      if(state.players.length === 1) state.finishedOrder.push(state.players[0]);
+      endGame();
+      return;
+    }
+
+    if(justFinishedColor){
+      // pick next player after the removed one (array already shifted left)
+      state.currentColor = state.players[removalIdx % state.players.length];
+    } else if(state.dice === 6 || captured || toPos === 56){
+      // extra turn, same player
+    } else {
+      advanceTurn();
+    }
+
+    renderAll();
+  }
+
+  function advanceTurn(){
+    const idx = state.players.indexOf(state.currentColor);
+    state.currentColor = state.players[(idx+1) % state.players.length];
+  }
+
+  function endGame(){
+    state.gameOver = true;
+    renderAll();
+    const rankList = document.getElementById('rankList');
+    rankList.innerHTML = '';
+    state.finishedOrder.forEach(color=>{
+      const li = document.createElement('li');
+      li.textContent = COLOR_LABEL[color];
+      li.style.color = colorVar(color);
+      li.style.fontWeight = '700';
+      rankList.appendChild(li);
+    });
+    document.getElementById('winModal').classList.remove('hidden');
+  }
+
+  /* ---------------- SETUP SCREEN ---------------- */
+  const toggles = document.querySelectorAll('.colorToggle');
+  toggles.forEach(t=>{
+    t.addEventListener('click', ()=>{
+      const activeCount = document.querySelectorAll('.colorToggle.active').length;
+      if(t.classList.contains('active') && activeCount <= 2){
+        document.getElementById('setupHint').textContent = 'You need at least 2 players.';
+        return;
+      }
+      t.classList.toggle('active');
+      document.getElementById('setupHint').textContent = '';
+    });
+  });
+
+  document.getElementById('startBtn').addEventListener('click', ()=>{
+    const active = Array.from(document.querySelectorAll('.colorToggle.active')).map(t=>t.dataset.c);
+    // keep in fixed play order red,green,yellow,blue
+    const ordered = ALL_COLORS.filter(c=>active.includes(c));
+    if(ordered.length < 2){
+      document.getElementById('setupHint').textContent = 'Pick at least 2 players.';
+      return;
+    }
+    startGame(ordered);
+  });
+
+  function startGame(activeColors){
+    state = freshState(activeColors);
+    buildBoardDOM();
+    document.getElementById('setupScreen').classList.add('hidden');
+    document.getElementById('gameScreen').classList.remove('hidden');
+    document.getElementById('winModal').classList.add('hidden');
+    document.getElementById('logBody').innerHTML = '';
+    renderDice(null);
+    log(`Game started: ${activeColors.map(c=>COLOR_LABEL[c]).join(', ')}.`);
+    renderAll();
+  }
+
+  document.getElementById('rollBtn').addEventListener('click', rollDice);
+  document.getElementById('restartBtn').addEventListener('click', ()=>{
+    if(confirm('Are you sure you want to start a new game? Your current progress will be lost.')){
+      backToSetup();
+    }
+  });
+  document.getElementById('playAgainBtn').addEventListener('click', backToSetup);
+
+  function backToSetup(){
+    document.getElementById('gameScreen').classList.add('hidden');
+    document.getElementById('winModal').classList.add('hidden');
+    document.getElementById('setupScreen').classList.remove('hidden');
+  }
+
+  // Service Worker for Offline Capability
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').then(registration => {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      }, err => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
