@@ -34,9 +34,11 @@
   .panel h3{margin:0 0 14px;font-size:0.95em;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);}
   .colorToggles{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .colorToggle{
-    display:flex;align-items:center;gap:10px;border:2px solid var(--line);border-radius:12px;
+    display:flex;align-items:center;border:2px solid var(--line);border-radius:12px;
     padding:12px 14px;cursor:pointer;user-select:none;transition:all .15s;font-weight:600;
   }
+  .colorToggle .name{flex-grow:1; margin-left:10px;}
+  .aiToggle{margin-left:auto;font-size:0.75em;padding:4px 8px;border-radius:6px;background:rgba(0,0,0,0.15);font-weight:600;flex-shrink:0;}
   .colorToggle.active{border-color:transparent;color:#fff;transform:translateY(-1px);box-shadow:0 4px 10px rgba(0,0,0,0.15);}
   .colorToggle .dot{width:16px;height:16px;border-radius:50%;flex-shrink:0;}
   .colorToggle[data-c="red"].active{background:var(--red);}
@@ -76,8 +78,8 @@
   .yard-green{background:var(--green);}
   .yard-yellow{background:var(--yellow);}
   .yard-blue{background:var(--blue);}
-  .yard-inner{width:66%;height:66%;background:var(--board-bg);border-radius:14%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6%;padding:8%;}
-  .slot{border-radius:50%;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;}
+  .yard-inner{width:66%;height:66%;background:var(--board-bg);border-radius:14%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6%;padding:8%;position:relative;}
+  .slot{border-radius:50%;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;position:relative;}
 
   .cell{position:relative;background:var(--board-bg);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex-wrap:wrap;padding:1px;}
   .cell.start-red{background:var(--red);}
@@ -102,7 +104,7 @@
 
   .token{
     border-radius:50%;width:76%;height:76%;position:relative;cursor:default;
-    box-shadow:0 2px 4px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 2px 2px rgba(255,255,255,0.4);
+    box-shadow:0 2px 4px rgba(0,0,0,0.4), inset 0 -2px 3px rgba(0,0,0,0.25), inset 0 2px 2px rgba(255,255,255,0.4); position: absolute;
     border:1.5px solid rgba(0,0,0,0.25);
     transition:transform .12s;
   }
@@ -212,6 +214,7 @@
   <audio id="sound-home-stretch" src="./sounds/johnnybacon156-i-got-this-467997.mp3" preload="auto"></audio>
   <audio id="sound-home" src="./sounds/shrek_30-pop-wow-323262.mp3" preload="auto"></audio>
   <audio id="sound-win" src="./sounds/dragon-studio-air-horn-sound-effect-372453.mp3" preload="auto"></audio>
+  <audio id="sound-click" src="./sounds/johnnybacon156-fah-469417.mp3" preload="auto"></audio>
 </div>
 
 <div id="app">
@@ -312,11 +315,13 @@
   /* ---------------- STATE ---------------- */
   let state = null;
 
-  function freshState(activeColors){
+  function freshState(activeColors, aiPlayers){
     return {
       players: activeColors.slice(),
       currentColor: activeColors[0],
       tokens: Object.fromEntries(activeColors.map(c=>[c,[-1,-1,-1,-1]])),
+      isMuted: false,
+      aiPlayers: aiPlayers ? aiPlayers.slice() : [],
       finishedOrder: [],
       dice: null,
       consecutiveSix: 0,
@@ -412,25 +417,46 @@
 
   function renderTokens(){
     clearTokenDom();
+    const cellOccupants = {}; // key: 'r,c', value: [{color, idx}]
+
     state.players.forEach(color=>{
       state.tokens[color].forEach((pos, idx)=>{
-        const el = makeTokenEl(color);
-        el.dataset.color = color;
-        el.dataset.idx = idx;
         if(pos === -1){
+          const el = makeTokenEl(color);
+          el.dataset.color = color;
+          el.dataset.idx = idx;
           const slot = document.getElementById('slot-'+color+'-'+idx);
+          if(state.awaitingMove && color===state.currentColor && state.movable.includes(idx)){
+            el.classList.add('movable');
+            el.addEventListener('click', ()=>onTokenClick(color, idx));
+          }
           if(slot) slot.appendChild(el);
         } else {
           const [r,c] = paths[color][pos];
-          const cell = document.getElementById('cell-'+r+'-'+c);
-          if(cell) cell.appendChild(el);
+          const key = `${r},${c}`;
+          if(!cellOccupants[key]) cellOccupants[key] = [];
+          cellOccupants[key].push({color, idx});
         }
+      });
+    });
+
+    for(const key in cellOccupants){
+      const [r,c] = key.split(',');
+      const cell = document.getElementById(`cell-${r}-${c}`);
+      if(!cell) continue;
+      const occupants = cellOccupants[key];
+      occupants.forEach(({color, idx}, i) => {
+        const el = makeTokenEl(color);
+        el.dataset.color = color;
+        el.dataset.idx = idx;
+        el.style.transform = `translate(${i*4}px, ${-i*4}px)`; // Apply stacking offset
+        cell.appendChild(el);
         if(state.awaitingMove && color===state.currentColor && state.movable.includes(idx)){
           el.classList.add('movable');
           el.addEventListener('click', ()=>onTokenClick(color, idx));
         }
       });
-    });
+    }
   }
 
   function colorVar(color){
@@ -441,7 +467,7 @@
     const ti = document.getElementById('turnIndicator');
     if(state.gameOver){ ti.textContent = 'Game Over'; ti.style.background = '#555'; return; }
     ti.textContent = COLOR_LABEL[state.currentColor] + "'s Turn";
-    ti.style.background = colorVar(state.currentColor);
+    ti.style.background = colorVar(state.currentColor);    
   }
 
   function renderPlayerList(){
@@ -454,7 +480,7 @@
       if(finishedRank !== -1) row.classList.add('finished');
       const home = state.tokens[color].filter(p=>p===56).length;
       row.innerHTML = `<span class="dot" style="background:${colorVar(color)}"></span>
-        <span>${COLOR_LABEL[color]}</span>
+        <span>${COLOR_LABEL[color]} ${state.aiPlayers.includes(color) ? ' (AI)' : ''}</span>
         <span style="color:#999;font-size:0.85em;">${home}/4 home</span>
         ${finishedRank!==-1 ? `<span class="rank">#${finishedRank+1}</span>` : ''}`;
       body.appendChild(row);
@@ -494,6 +520,7 @@
   }
 
   function playSound(id){
+    if(state && state.isMuted) return;
     const sound = document.getElementById(id);
     if(sound){
       sound.currentTime = 0;
@@ -519,6 +546,11 @@
     const hint = document.getElementById('diceHint');
     if(state.gameOver) hint.textContent = '';
     else if(state.awaitingMove) hint.textContent = 'Tap a glowing piece to move it';
+    else if(state.aiPlayers.includes(state.currentColor) && !state.animating){
+      hint.textContent = `${COLOR_LABEL[state.currentColor]} (AI) is thinking...`;
+      // Trigger AI turn after a short delay for better UX
+      setTimeout(triggerAITurn, 800);
+    }
     else hint.textContent = '';
   }
 
@@ -551,12 +583,14 @@
 
   function finishRoll(){
     let val;
+    // Use crypto.getRandomValues for better randomness if available.
+    // The logic below is a common way to reduce modulo bias.
     if(window.crypto && window.crypto.getRandomValues){
       const randomArray = new Uint32Array(1);
       window.crypto.getRandomValues(randomArray);
       val = (randomArray[0] % 6) + 1;
     } else {
-      val = 1 + Math.floor(Math.random()*6); // Fallback for older browsers
+      val = 1 + Math.floor(Math.random() * 6); // Fallback for older browsers
     }
     state.dice = val;
     renderDice(val);
@@ -587,13 +621,79 @@
       state.awaitingMove = false;
       state.animating = true;
       renderAll(); // To disable roll button etc.
+      if(state.aiPlayers.includes(state.currentColor)){
+        // AI has only one move, just do it.
+        setTimeout(()=> moveToken(state.currentColor, movable[0]), 400);
+        return;
+      }
       // A small delay so the user can see the dice result before the token moves
       setTimeout(()=> moveToken(state.currentColor, movable[0]), 400);
     } else {
       state.movable = movable;
       state.awaitingMove = true;
       renderAll();
+      if(state.aiPlayers.includes(state.currentColor)){
+        const choice = getAIMove();
+        log(`AI chose to move piece #${choice+1}.`);
+        setTimeout(()=> onTokenClick(state.currentColor, choice), 500);
+      }
     }
+  }
+
+  function triggerAITurn(){
+    // Double check it's still AI's turn and not animating/awaiting human input
+    if(state.animating || state.awaitingMove || !state.aiPlayers.includes(state.currentColor)) return;
+    
+    // AI rolls the dice
+    rollDice();
+  }
+
+  function getAIMove(){
+    const color = state.currentColor;
+    const dice = state.dice;
+    const movable = state.movable;
+
+    // 1. If a move gets a token home, take it.
+    for(const idx of movable){
+      if(state.tokens[color][idx] + dice === 56) return idx;
+    }
+
+    // 2. If a move can capture an opponent, take it.
+    for(const idx of movable){
+      const fromPos = state.tokens[color][idx];
+      const toPos = (fromPos === -1) ? 0 : fromPos + dice;
+      if(toPos > 50) continue; // Cannot capture on home stretch
+
+      const [r,c] = paths[color][toPos];
+      const key = r+','+c;
+      if(safeCoords.has(key)) continue; // Cannot capture on safe spot
+
+      let canCapture = false;
+      for(const other of state.players){
+        if(other === color) continue;
+        for(const p2 of state.tokens[other]){
+          if(p2 < 0 || p2 > 50) continue;
+          const [r2,c2] = paths[other][p2];
+          if(r2 === r && c2 === c) canCapture = true;
+        }
+      }
+      if(canCapture) return idx;
+    }
+
+    // 3. If dice is 6 and a token is in the yard, get it out.
+    if(dice === 6){
+      for(const idx of movable){
+        if(state.tokens[color][idx] === -1) return idx;
+      }
+    }
+
+    // 4. Move the token that is furthest along the path.
+    let bestIdx = -1;
+    let maxPos = -2;
+    for(const idx of movable){
+      if(state.tokens[color][idx] > maxPos) { maxPos = state.tokens[color][idx]; bestIdx = idx; }
+    }
+    return bestIdx;
   }
 
   function onTokenClick(color, idx){
@@ -737,30 +837,59 @@
   /* ---------------- SETUP SCREEN ---------------- */
   const toggles = document.querySelectorAll('.colorToggle');
   toggles.forEach(t=>{
-    t.addEventListener('click', ()=>{
-      const activeCount = document.querySelectorAll('.colorToggle.active').length;
-      if(t.classList.contains('active') && activeCount <= 2){
-        document.getElementById('setupHint').textContent = 'You need at least 2 players.';
-        return;
+    t.addEventListener('click', (event)=>{
+      // Handle clicks on the AI toggle separately
+      if(event.target.classList.contains('aiToggle')){
+        playSound('sound-click');
+        const currentText = event.target.textContent;
+        if (currentText === 'Human') { // Trying to switch TO AI
+          // Count current AI players among active players
+          const activeAiToggles = document.querySelectorAll('.colorToggle.active .aiToggle');
+          let aiCount = 0;
+          activeAiToggles.forEach(toggle => { if (toggle.textContent === 'AI') aiCount++; });
+
+          if (t.classList.contains('active') && aiCount >= 3) {
+            document.getElementById('setupHint').textContent = 'A maximum of 3 AI bots are allowed.';
+            return;
+          }
+        }
+        event.target.textContent = (currentText === 'Human') ? 'AI' : 'Human';
+      } else {
+        playSound('sound-click');
+        const activeCount = document.querySelectorAll('.colorToggle.active').length;
+        if(t.classList.contains('active') && activeCount <= 2){
+          document.getElementById('setupHint').textContent = 'You need at least 2 players.';
+          return;
+        }
+        t.classList.toggle('active');
       }
-      t.classList.toggle('active');
       document.getElementById('setupHint').textContent = '';
     });
   });
 
   document.getElementById('startBtn').addEventListener('click', ()=>{
-    const active = Array.from(document.querySelectorAll('.colorToggle.active')).map(t=>t.dataset.c);
+    playSound('sound-click');
+    const activeColors = [];
+    const aiPlayers = [];
+    document.querySelectorAll('.colorToggle.active').forEach(t=>{
+      const color = t.dataset.c;
+      activeColors.push(color);
+      if(t.querySelector('.aiToggle').textContent === 'AI'){
+        aiPlayers.push(color);
+      }
+    });
+
     // keep in fixed play order red,green,yellow,blue
-    const ordered = ALL_COLORS.filter(c=>active.includes(c));
+    const ordered = ALL_COLORS.filter(c=>activeColors.includes(c));
     if(ordered.length < 2){
       document.getElementById('setupHint').textContent = 'Pick at least 2 players.';
       return;
     }
-    startGame(ordered);
+    startGame(ordered, aiPlayers);
   });
 
-  function startGame(activeColors){
-    state = freshState(activeColors);
+  function startGame(activeColors, aiPlayers){
+    state = freshState(activeColors, aiPlayers);
     buildDiceDOM();
     buildBoardDOM();
     document.getElementById('setupScreen').classList.add('hidden');
@@ -774,11 +903,13 @@
 
   document.getElementById('rollBtn').addEventListener('click', rollDice);
   document.getElementById('restartBtn').addEventListener('click', ()=>{
+    playSound('sound-click');
     if(confirm('Are you sure you want to start a new game? Your current progress will be lost.')){
       backToSetup();
     }
   });
   document.getElementById('playAgainBtn').addEventListener('click', ()=>{
+    playSound('sound-click');
     backToSetup();
   });
   function backToSetup(){
@@ -786,6 +917,20 @@
     document.getElementById('winModal').classList.add('hidden');
     document.getElementById('setupScreen').classList.remove('hidden');
   }
+
+  // Initial setup for AI toggles
+  document.querySelectorAll('.colorToggle').forEach((t,i)=>{
+    const originalText = t.textContent.trim();
+    const dot = t.querySelector('.dot').cloneNode(true);
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = originalText;
+    const ai = document.createElement('div');
+    ai.className = 'aiToggle';
+    ai.textContent = 'Human'; // Default all players to Human
+    t.innerHTML = '';
+    t.append(dot, name, ai);
+  });
 
   // Service Worker for Offline Capability
   if ('serviceWorker' in navigator) {
