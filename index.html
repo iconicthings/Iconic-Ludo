@@ -210,11 +210,12 @@
 <div id="audioContainer" style="display:none;">
   <audio id="sound-roll" src="./sounds/ribhavagrawal-funny-african-tabla-230535.mp3" preload="auto"></audio>
   <audio id="sound-move" src="./sounds/dragon-studio-thud-sound-effect-405470.mp3" preload="auto"></audio>
-  <audio id="sound-capture" src="./sounds/universfield-funny-child-laughter-117727 (1).mp3" preload="auto"></audio>
-  <audio id="sound-home-stretch" src="./sounds/johnnybacon156-i-got-this-467997.mp3" preload="auto"></audio>
+  <audio id="sound-capture" src="./sounds/aisa-mat-karo.mp3" preload="auto"></audio>
+  <audio id="sound-home-stretch" src="./sounds/chalo.mp3" preload="auto"></audio>
   <audio id="sound-home" src="./sounds/shrek_30-pop-wow-323262.mp3" preload="auto"></audio>
-  <audio id="sound-win" src="./sounds/dragon-studio-air-horn-sound-effect-372453.mp3" preload="auto"></audio>
-  <audio id="sound-click" src="./sounds/johnnybacon156-fah-469417.mp3" preload="auto"></audio>
+  <audio id="sound-win" src="./sounds/indian-guy-meow.mp3" preload="auto"></audio>
+  <audio id="sound-click" src="./sounds/anime-ahh.mp3" preload="auto"></audio>
+  <audio id="sound-intro" src="./sounds/896756048.mp3" preload="auto"></audio>
 </div>
 
 <div id="app">
@@ -869,6 +870,7 @@
 
   document.getElementById('startBtn').addEventListener('click', ()=>{
     playSound('sound-click');
+    playSound('sound-intro');
     const activeColors = [];
     const aiPlayers = [];
     document.querySelectorAll('.colorToggle.active').forEach(t=>{
