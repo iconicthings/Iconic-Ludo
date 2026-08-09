@@ -120,14 +120,29 @@
     padding:12px 16px;border-radius:12px;color:#fff;font-weight:700;font-size:1.05em;
     text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.15);transition:background .2s;
   }
-  #diceCard{background:var(--paper);border-radius:14px;padding:16px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.08);}
+  #diceCard{background:var(--paper);border-radius:14px;padding:16px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.08);perspective:800px;}
   #dice{
-    width:64px;height:64px;margin:0 auto 12px;background:var(--board-bg);border-radius:14px;border:2px solid var(--line);
-    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:8px;gap:2px;
-    box-shadow:0 3px 0 rgba(0,0,0,0.25);transition:transform .15s;
+    width:64px;height:64px;margin:0 auto 12px;
+    position:relative;transform-style:preserve-3d;
+    transition:transform 0.8s;
   }
-  #dice.rolling{animation:spin .5s linear infinite;}
-  @keyframes spin{0%{transform:rotate(0deg) scale(1);}50%{transform:rotate(180deg) scale(1.1);}100%{transform:rotate(360deg) scale(1);}}
+  .dice-face{
+    position:absolute;width:100%;height:100%;
+    background:var(--board-bg);border:2px solid var(--line);border-radius:10px;
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:8px;gap:2px;
+  }
+  .face-1{ transform: rotateY(0deg) translateZ(32px); }
+  .face-6{ transform: rotateY(180deg) translateZ(32px); }
+  .face-3{ transform: rotateY(90deg) translateZ(32px); }
+  .face-4{ transform: rotateY(-90deg) translateZ(32px); }
+  .face-2{ transform: rotateX(90deg) translateZ(32px); }
+  .face-5{ transform: rotateX(-90deg) translateZ(32px); }
+
+  #dice.rolling{animation:tumble 0.8s linear infinite;}
+  @keyframes tumble {
+    0%   { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+    100% { transform: rotateX(720deg) rotateY(1080deg) rotateZ(360deg); }
+  }
   .pip{border-radius:50%;background:var(--ink);opacity:0;align-self:center;justify-self:center;width:10px;height:10px;}
   .pip.on{opacity:1;}
   #rollBtn{
@@ -163,9 +178,42 @@
     #boardWrap{width:min(560px,94vw);}
     #sidePanel{width:min(560px,94vw);}
   }
+
+  /* ---------- PARTICLE EFFECT ---------- */
+  .particle-burst {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    left: -4px; top: -4px;
+    animation: burst 0.7s ease-out forwards;
+  }
+  @keyframes burst {
+    0% { transform: scale(1); opacity: 1; }
+    100% {
+      transform: scale(0) translate(var(--tx), var(--ty));
+      opacity: 0;
+    }
+  }
 </style>
 </head>
 <body>
+<div id="audioContainer" style="display:none;">
+  <audio id="sound-roll" src="./sounds/ribhavagrawal-funny-african-tabla-230535.mp3" preload="auto"></audio>
+  <audio id="sound-move" src="./sounds/dragon-studio-thud-sound-effect-405470.mp3" preload="auto"></audio>
+  <audio id="sound-capture" src="./sounds/universfield-funny-child-laughter-117727 (1).mp3" preload="auto"></audio>
+  <audio id="sound-home-stretch" src="./sounds/johnnybacon156-i-got-this-467997.mp3" preload="auto"></audio>
+  <audio id="sound-home" src="./sounds/shrek_30-pop-wow-323262.mp3" preload="auto"></audio>
+  <audio id="sound-win" src="./sounds/dragon-studio-air-horn-sound-effect-372453.mp3" preload="auto"></audio>
+</div>
+
 <div id="app">
 
   <!-- SETUP -->
@@ -194,13 +242,8 @@
     <div id="mainArea">
       <div id="boardWrap"><div id="board"></div></div>
       <div id="sidePanel">
-        <div id="turnIndicator">—</div>
-        <div id="diceCard">
-          <div id="dice">
-            <div class="pip"></div><div class="pip"></div><div class="pip"></div>
-            <div class="pip"></div><div class="pip"></div><div class="pip"></div>
-            <div class="pip"></div><div class="pip"></div><div class="pip"></div>
-          </div>
+        <div id="turnIndicator">—</div><div id="diceCard">
+          <div id="dice"></div>
           <button id="rollBtn">Roll Dice</button>
           <div id="diceHint"></div>
         </div>
@@ -419,13 +462,42 @@
   }
 
   function renderDice(val){
+    const diceEl = document.getElementById('dice');
+    if(!val){
+      diceEl.style.transform = `rotateX(0deg) rotateY(0deg)`;
+      return;
+    }
+    const rotations = {
+      1: `rotateY(0deg)`,
+      2: `rotateX(-90deg)`,
+      3: `rotateY(-90deg)`,
+      4: `rotateY(90deg)`,
+      5: `rotateX(90deg)`,
+      6: `rotateY(-180deg)`
+    };
+    diceEl.style.transform = `translateZ(-100px) ${rotations[val]}`;
+  }
+
+  function buildDiceDOM(){
+    const diceEl = document.getElementById('dice');
+    diceEl.innerHTML = '';
     const patterns = {
       1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8]
     };
-    const pips = document.querySelectorAll('#dice .pip');
-    pips.forEach(p=>p.classList.remove('on'));
-    if(val){
-      patterns[val].forEach(i=>pips[i].classList.add('on'));
+    for(let i=1; i<=6; i++){
+      const face = document.createElement('div');
+      face.className = `dice-face face-${i}`;
+      const pips = patterns[i].map(pipIdx => `<div class="pip on" style="grid-area:${Math.floor(pipIdx/3)+1}/${(pipIdx%3)+1}"></div>`).join('');
+      face.innerHTML = pips;
+      diceEl.appendChild(face);
+    }
+  }
+
+  function playSound(id){
+    const sound = document.getElementById(id);
+    if(sound){
+      sound.currentTime = 0;
+      sound.play().catch(e => console.warn("Sound play failed. User may need to interact with the page first.", e));
     }
   }
 
@@ -463,23 +535,29 @@
 
   function rollDice(){
     if(state.animating || state.awaitingMove || state.gameOver) return;
+    playSound('sound-roll');
     const dice = document.getElementById('dice');
     dice.classList.add('rolling');
     document.getElementById('rollBtn').disabled = true;
-    let ticks = 0;
-    const spin = setInterval(()=>{
-      renderDice(1 + Math.floor(Math.random()*6));
-      ticks++;
-      if(ticks > 8){
-        clearInterval(spin);
+    
+    // Reset transform to allow re-rolling the same number
+    dice.style.transform = 'translateZ(-100px) rotateX(180deg) rotateY(180deg)';
+
+    setTimeout(()=>{
         dice.classList.remove('rolling');
         finishRoll();
-      }
-    }, 60);
+    }, 1000);
   }
 
   function finishRoll(){
-    const val = 1 + Math.floor(Math.random()*6);
+    let val;
+    if(window.crypto && window.crypto.getRandomValues){
+      const randomArray = new Uint32Array(1);
+      window.crypto.getRandomValues(randomArray);
+      val = (randomArray[0] % 6) + 1;
+    } else {
+      val = 1 + Math.floor(Math.random()*6); // Fallback for older browsers
+    }
     state.dice = val;
     renderDice(val);
     log(`${COLOR_LABEL[state.currentColor]} rolled a ${val}.`);
@@ -535,9 +613,10 @@
 
     let i = 0;
     function step(){
-      if(i >= steps.length){ afterMove(color, idx, toPos); return; }
+      if(i >= steps.length){ afterMove(color, idx, toPos, fromPos); return; }
       state.tokens[color][idx] = steps[i];
       renderTokens();
+      playSound('sound-move');
       i++;
       setTimeout(step, 150);
     }
@@ -545,7 +624,7 @@
     step();
   }
 
-  function afterMove(color, idx, toPos){
+  function afterMove(color, idx, toPos, fromPos){
     let captured = false;
 
     if(toPos <= 50){
@@ -561,19 +640,28 @@
               state.tokens[other][idx2] = -1;
               captured = true;
               log(`💥 ${COLOR_LABEL[color]} sent ${COLOR_LABEL[other]}'s piece back home!`);
+              playSound('sound-capture');
+              createCaptureEffect(r, c, other);
             }
           });
         });
       }
     }
 
+    if(fromPos <= 50 && toPos > 50 && toPos < 56){
+      playSound('sound-home-stretch');
+      log(`🙌 ${COLOR_LABEL[color]} entered the home stretch!`);
+    }
+
     let justFinishedColor = false;
     let removalIdx = 0;
     if(toPos === 56){
+      playSound('sound-home');
       log(`🏠 ${COLOR_LABEL[color]} got a piece home!`);
       if(state.tokens[color].every(p=>p===56)){
         justFinishedColor = true;
         state.finishedOrder.push(color);
+        playSound('sound-win');
         log(`🎉 ${COLOR_LABEL[color]} finished all pieces — place #${state.finishedOrder.length}!`);
         removalIdx = state.players.indexOf(color);
         state.players = state.players.filter(c=>c!==color);
@@ -604,6 +692,31 @@
   function advanceTurn(){
     const idx = state.players.indexOf(state.currentColor);
     state.currentColor = state.players[(idx+1) % state.players.length];
+  }
+
+  function createCaptureEffect(r, c, color){
+    const boardWrap = document.getElementById('boardWrap');
+    const cell = document.getElementById(`cell-${r}-${c}`);
+    if(!cell || !boardWrap) return;
+
+    const boardRect = boardWrap.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+
+    const burst = document.createElement('div');
+    burst.className = 'particle-burst';
+    burst.style.left = `${cellRect.left - boardRect.left + cellRect.width / 2}px`;
+    burst.style.top = `${cellRect.top - boardRect.top + cellRect.height / 2}px`;
+
+    for(let i=0; i<15; i++){
+      const p = document.createElement('div');
+      p.className = 'particle';
+      p.style.background = colorVar(color);
+      p.style.setProperty('--tx', `${(Math.random() - 0.5) * 90}px`);
+      p.style.setProperty('--ty', `${(Math.random() - 0.5) * 90}px`);
+      burst.appendChild(p);
+    }
+    boardWrap.appendChild(burst);
+    setTimeout(()=> burst.remove(), 700);
   }
 
   function endGame(){
@@ -648,6 +761,7 @@
 
   function startGame(activeColors){
     state = freshState(activeColors);
+    buildDiceDOM();
     buildBoardDOM();
     document.getElementById('setupScreen').classList.add('hidden');
     document.getElementById('gameScreen').classList.remove('hidden');
@@ -664,8 +778,9 @@
       backToSetup();
     }
   });
-  document.getElementById('playAgainBtn').addEventListener('click', backToSetup);
-
+  document.getElementById('playAgainBtn').addEventListener('click', ()=>{
+    backToSetup();
+  });
   function backToSetup(){
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('winModal').classList.add('hidden');
